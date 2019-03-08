@@ -1,0 +1,262 @@
+using System;
+using System.Runtime;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Text;
+using Newtonsoft.Json;
+using AspNetCore.Http.Extensions;
+using System.Runtime.Serialization;
+using System.Net;
+
+namespace HitApis
+{
+    [Serializable]
+    public class GetUserInterest
+    {
+        public List<Interest> interests = new List<Interest>();
+    }
+    [Serializable]
+    public class Interest
+    {
+        public int interest_id { get; set; }
+        public string interest { get; set; }
+        public int parent_id { get; set; }
+        public bool has_children { get; set; }
+        public bool is_my_Interest { get; set; }
+    }
+    [Serializable]
+    public class DeviceInfo
+    {
+        public string device_token { get; set; }
+        public string device_type { get; set; }
+    }
+    [Serializable]
+    public class LoginDetail
+    {
+        public DeviceInfo device_info;
+        public PhoneNumber phone_number;
+        public string email_id { get; set; }
+        public string password { get; set; }
+    }
+    [Serializable]
+    public class LoginResponse
+    {
+        public UserProfileResponse userProfileResponse;
+        public PhoneNumber phoneNumber;
+        public int user_id { get; set; }
+        public string auth_token { get; set; }
+        public bool is_account_deactivated { get; set; }
+        public bool has_interests { get; set; }
+        public bool has_values { get; set; }
+        public bool is_number_verified { get; set; }
+    }
+    [Serializable]
+    public class UserProfileResponse
+    {
+        public string lres_id { get; set; }
+        public string hres_id { get; set; }
+        public int followers { get; set; }
+        public int following { get; set; }
+        public int mentors { get; set; }
+        public int mentees { get; set; }
+        public string basic_info { get; set; }
+        public long birth_date { get; set; }
+        public int charge_price { get; set; }
+        public int requests { get; set; }
+        public string video_bio_lres { get; set; }
+        public string video_bio_hres { get; set; }
+        public string name { get; set; }
+        public int noofpost { get; set; }
+    }
+    [Serializable]
+    public class PhoneNumber
+    {
+        public string cc { get; set; }
+        public string iso_alpha_2_cc { get; set; }
+        public string number { get; set; }
+    }
+    [Serializable]
+    public class Register
+    {
+        public PhoneNumber phone_number { get; set; }
+        public string password { get; set; }
+        public DeviceInfo device_info { get; set; }
+        public UserProfile user_profile { get; set; }
+    }
+    [Serializable]
+    public class UserProfile
+    {
+        public string birth_date { get; set; }
+        public string name { get; set; }
+        public string basic_info { get; set; }
+        public string video_bio_hres { get; set; }
+    }
+
+    public class Program
+    {
+        public static void Main()
+        {
+            LoginResponse loginResponse = new LoginResponse();
+            Interest interestData = new Interest();
+            string updateUrl = "http://stagecore.mentorz.com:8080/mentorz/api/v3/user/1170/interests";
+            PostRequest("http://stagecore.mentorz.com:8080/mentorz/api/v3/user/login", loginResponse, updateUrl);
+            PutRequest("http://stagecore.mentorz.com:8080/mentorz/api/v3/user");
+            DeleteRequest("http://stagecore.mentorz.com:8080/mentorz/api/v3/user", loginResponse);
+            Console.ReadKey();
+        }
+
+        async static void PostRequest(string url, LoginResponse loginResponse, string updateUrl)
+        {
+            LoginDetail loginDetail = new LoginDetail()
+            {
+                email_id = "",
+                phone_number = new PhoneNumber()
+                {
+                    cc = "91",
+                    iso_alpha_2_cc = "in",
+                    number = "9891670901"
+                },
+                password = "qwertyuiop",
+                device_info = new DeviceInfo()
+                {
+                    device_token = "test_token",
+                    device_type = "ANDROID"
+                },
+            };
+
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client.DefaultRequestHeaders.Add("user-agent", "fdgdcsdvfsgfc");
+                HttpResponseMessage response = await client.PostAsJsonAsync(url, loginDetail);
+                Console.WriteLine("login response code : " + response.StatusCode);
+
+                using (HttpContent content = response.Content)
+                {
+                    string myContent = await content.ReadAsStringAsync();
+                    LoginResponse deserializeData = JsonConvert.DeserializeObject<LoginResponse>(myContent);
+                    Console.WriteLine("auth token: {0} ", deserializeData.auth_token);
+                    loginResponse.auth_token = deserializeData.auth_token;
+                }
+
+                client.DefaultRequestHeaders.Add("oauth-token", loginResponse.auth_token);
+
+                Interest interest = new Interest()
+                {
+                    interest_id = 868,
+                    interest = "Abseiling",
+                    parent_id = 867,
+                    has_children = false,
+                    is_my_Interest = false
+                };
+
+                GetUserInterest getUserInterest = new GetUserInterest();
+                getUserInterest.interests = new List<Interest>();
+                getUserInterest.interests.Add(interest);
+
+                using (HttpResponseMessage responses = await client.PostAsJsonAsync(updateUrl, getUserInterest))
+                {
+
+                    Console.WriteLine("from update user interest : " + responses.StatusCode);
+                }
+
+                GetRequest("http://stagecore.mentorz.com:8080/mentorz/api/v3/user/1170/interest", loginResponse);
+            }
+        }
+
+        async static void GetRequest(string url, LoginResponse loginResponse)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client.DefaultRequestHeaders.Add("user-agent", "fdgdcsdvfsgfc");
+                client.DefaultRequestHeaders.Add("oauth-token", loginResponse.auth_token);
+
+                using (HttpResponseMessage response = await client.GetAsync(url))
+                {
+                    using (HttpContent content = response.Content)
+                    {
+                        string myContent = await content.ReadAsStringAsync();
+                        GetUserInterest getUserInterest = JsonConvert.DeserializeObject<GetUserInterest>(myContent);
+                        Console.WriteLine();
+                        foreach (var list in getUserInterest.interests)
+                        {
+                            Console.WriteLine("interest_id:{0}\ninterest:{1}\nparent_id:{2}\nhas_children:{3}\nis_my_interest:{4}"
+                            , list.interest_id, list.interest, list.parent_id, list.has_children, list.is_my_Interest);
+                        }
+                    }
+                }
+            }
+        }
+
+        async static void PutRequest(string url)
+        {
+            Register register = new Register()
+            {
+                phone_number = new PhoneNumber()
+                {
+                    cc = "91",
+                    iso_alpha_2_cc = "in",
+                    number = "9058883263"
+                },
+                password = "qwerty",
+                device_info = new DeviceInfo()
+                {
+                    device_token = "testdtoken",
+                    device_type = "IOS"
+                },
+                user_profile = new UserProfile()
+                {
+                    birth_date = "769564800000",
+                    name = "Anuj New",
+                    basic_info = ".NET developer",
+                    video_bio_hres = ""
+                }
+            };
+
+            string jsonData = JsonConvert.SerializeObject(register);
+            HttpContent httpContent = new StringContent(jsonData.ToString(), Encoding.UTF8, "application/json");
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client.DefaultRequestHeaders.Add("user-agent", "fdgdcsdvfsgfc");
+
+                using (HttpResponseMessage response = await client.PutAsync(url, httpContent))
+                {
+                    Console.WriteLine(response.StatusCode);
+                }
+            }
+        }
+
+        async static void DeleteRequest(string url, LoginResponse loginResponse)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                client.DefaultRequestHeaders.Add("user-agent", "fdgdcsdvfsgfc");
+                client.DefaultRequestHeaders.Add("oauth-token", loginResponse.auth_token);
+
+                using (HttpResponseMessage response = await client.DeleteAsync(url))
+                {
+                    using (HttpContent content = response.Content)
+                    {
+                        string myContent = await content.ReadAsStringAsync();
+                        Console.WriteLine(response.StatusCode);
+                    }
+                }
+            }
+        }
+
+
+    }
+}
+
